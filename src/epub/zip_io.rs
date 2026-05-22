@@ -1,6 +1,7 @@
 use std::io::{Cursor, Read, Write};
 
 use anyhow::Result;
+use rayon::prelude::*;
 use zip::write::SimpleFileOptions;
 use zip::{CompressionMethod, ZipArchive, ZipWriter};
 
@@ -48,29 +49,52 @@ impl Epub {
     }
 }
 
-/// Parse an EPUB from raw zip bytes.
+/// Parse an EPUB from raw zip bytes, decompressing entries in parallel.
 pub fn read_epub(bytes: &[u8]) -> Result<Epub> {
-    let mut zip = ZipArchive::new(Cursor::new(bytes))?;
-    let mut entries = Vec::new();
-    for i in 0..zip.len() {
-        let mut file = zip.by_index(i)?;
-        if file.is_dir() {
-            continue;
-        }
-        let name = file.name().to_string();
-        if name == "mimetype" {
-            continue;
-        }
-        let mut data = Vec::with_capacity(file.size() as usize);
-        file.read_to_end(&mut data)?;
-        entries.push(Entry { name, data });
-    }
-    Ok(Epub { entries })
+    let count = ZipArchive::new(Cursor::new(bytes))?.len();
+
+    let entries: Vec<Option<Entry>> = (0..count)
+        .into_par_iter()
+        .map(|i| -> Result<Option<Entry>> {
+            let mut zip = ZipArchive::new(Cursor::new(bytes))?;
+            let mut file = zip.by_index(i)?;
+            let name = file.name().to_string();
+            if file.is_dir() || name == "mimetype" {
+                return Ok(None);
+            }
+            let mut data = Vec::with_capacity(file.size() as usize);
+            file.read_to_end(&mut data)?;
+            Ok(Some(Entry { name, data }))
+        })
+        .collect::<Result<Vec<_>>>()?;
+
+    Ok(Epub {
+        entries: entries.into_iter().flatten().collect(),
+    })
+}
+
+/// Compress a single entry into a standalone in-memory archive.
+fn compress_entry(entry: &Entry) -> zip::result::ZipResult<ZipArchive<Cursor<Vec<u8>>>> {
+    let mut zip = ZipWriter::new(Cursor::new(Vec::new()));
+    let deflated = SimpleFileOptions::default().compression_method(CompressionMethod::Deflated);
+    zip.start_file(&entry.name, deflated)?;
+    zip.write_all(&entry.data)?;
+    zip.finish_into_readable()
 }
 
 /// Serialize an EPUB to zip bytes, writing `mimetype` first and uncompressed
 /// as the EPUB specification requires.
+///
+/// Deflate compression dominates the cost, so every entry is compressed in
+/// parallel into its own archive; those archives are then raw-copied (without
+/// recompression) into the final container.
 pub fn write_epub(epub: &Epub) -> Result<Vec<u8>> {
+    let parts: Vec<ZipArchive<Cursor<Vec<u8>>>> = epub
+        .entries
+        .par_iter()
+        .map(compress_entry)
+        .collect::<zip::result::ZipResult<_>>()?;
+
     let mut buf = Vec::new();
     {
         let mut zip = ZipWriter::new(Cursor::new(&mut buf));
@@ -79,11 +103,8 @@ pub fn write_epub(epub: &Epub) -> Result<Vec<u8>> {
         zip.start_file("mimetype", stored)?;
         zip.write_all(MIMETYPE)?;
 
-        let deflated =
-            SimpleFileOptions::default().compression_method(CompressionMethod::Deflated);
-        for entry in &epub.entries {
-            zip.start_file(&entry.name, deflated)?;
-            zip.write_all(&entry.data)?;
+        for part in parts {
+            zip.merge_archive(part)?;
         }
         zip.finish()?;
     }

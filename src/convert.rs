@@ -1,4 +1,5 @@
 use anyhow::{Context, Result};
+use rayon::prelude::*;
 
 use crate::epub::{container, opf, read_epub, write_epub, Epub};
 use crate::html;
@@ -66,14 +67,26 @@ pub fn convert_epub(bytes: &[u8]) -> Result<Vec<u8>> {
         None => fallback_docs(&epub),
     };
 
-    for path in &content_docs {
-        let Some(raw) = epub.get(path).map(<[u8]>::to_vec) else {
-            continue;
-        };
-        let doc = html::parse(&raw);
-        html::wrap::transform(&doc);
-        html::kobospan::transform(&doc);
-        epub.set(path, html::serialize(&doc).into_bytes());
+    // Transform every content document in parallel. Each document is parsed,
+    // rewritten, and serialized within a single closure, so the (non-Send)
+    // DOM never crosses a thread boundary.
+    let inputs: Vec<(String, Vec<u8>)> = content_docs
+        .iter()
+        .filter_map(|path| epub.get(path).map(|raw| (path.clone(), raw.to_vec())))
+        .collect();
+
+    let outputs: Vec<(String, Vec<u8>)> = inputs
+        .par_iter()
+        .map(|(path, raw)| {
+            let doc = html::parse(raw);
+            html::wrap::transform(&doc);
+            html::kobospan::transform(&doc);
+            (path.clone(), html::serialize(&doc).into_bytes())
+        })
+        .collect();
+
+    for (path, data) in outputs {
+        epub.set(&path, data);
     }
 
     if let Some(path) = &opf_path {

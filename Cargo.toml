@@ -13,6 +13,7 @@ path = "src/main.rs"
 anyhow = "1"
 clap = { version = "4", features = ["derive"] }
 indicatif = "0.17"
+rayon = "1"
 walkdir = "2"
 zip = { version = "2", default-features = false, features = ["deflate"] }
 quick-xml = "0.36"

@@ -10,6 +10,7 @@ use std::process::ExitCode;
 use anyhow::{Context, Result};
 use clap::Parser;
 use indicatif::{ProgressBar, ProgressStyle};
+use rayon::prelude::*;
 
 use crate::cli::Cli;
 use crate::jobs::Job;
@@ -45,20 +46,30 @@ fn run(args: &Cli) -> Result<usize> {
             .expect("valid progress template"),
     );
 
+    // Convert books in parallel; each job is fully independent.
+    let results: Vec<(&Job, Result<()>)> = plan
+        .jobs
+        .par_iter()
+        .map(|job| {
+            let outcome = convert_job(job, args.in_place);
+            bar.set_message(file_label(job));
+            bar.inc(1);
+            (job, outcome)
+        })
+        .collect();
+    bar.finish_and_clear();
+
     let mut converted = 0usize;
     let mut failed = 0usize;
-    for job in &plan.jobs {
-        bar.set_message(file_label(job));
-        match convert_job(job, args.in_place) {
+    for (job, outcome) in &results {
+        match outcome {
             Ok(()) => converted += 1,
             Err(e) => {
                 failed += 1;
-                bar.suspend(|| eprintln!("error: {}: {e:#}", job.source.display()));
+                eprintln!("error: {}: {e:#}", job.source.display());
             }
         }
-        bar.inc(1);
     }
-    bar.finish_and_clear();
 
     println!(
         "converted {converted}, skipped {}, failed {failed}",

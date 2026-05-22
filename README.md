@@ -10,6 +10,9 @@ accurate page numbers, and reading statistics. `kepub` performs the full
 conversion — not just a file rename — and writes files with the `.kepub.epub`
 extension that Kobo expects.
 
+Conversion is heavily parallelized — books, the content documents within each
+book, and zip (de)compression all run across every available CPU core.
+
 ## Usage
 
 ```
