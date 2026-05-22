@@ -5,5 +5,5 @@ pub mod sentences;
 pub mod serialize;
 pub mod wrap;
 
-pub use parse::{parse, Document};
+pub use parse::parse;
 pub use serialize::serialize;

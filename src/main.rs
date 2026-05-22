@@ -1,26 +1,91 @@
 mod cli;
+mod convert;
 mod epub;
 mod html;
 mod jobs;
 
-use anyhow::Result;
+use std::fs;
+use std::process::ExitCode;
+
+use anyhow::{Context, Result};
 use clap::Parser;
+use indicatif::{ProgressBar, ProgressStyle};
 
 use crate::cli::Cli;
+use crate::jobs::Job;
 
-fn main() -> Result<()> {
+fn main() -> ExitCode {
     let args = Cli::parse();
-    let plan = jobs::build_plan(&args)?;
-
-    println!("{} file(s) to convert:", plan.jobs.len());
-    for job in &plan.jobs {
-        println!("  {}  ->  {}", job.source.display(), job.target.display());
-    }
-    if !plan.skipped.is_empty() {
-        println!("{} file(s) skipped (target exists):", plan.skipped.len());
-        for source in &plan.skipped {
-            println!("  {}", source.display());
+    match run(&args) {
+        Ok(0) => ExitCode::SUCCESS,
+        Ok(_) => ExitCode::FAILURE,
+        Err(e) => {
+            eprintln!("error: {e:#}");
+            ExitCode::FAILURE
         }
+    }
+}
+
+/// Run every conversion job, returning the number of failures.
+fn run(args: &Cli) -> Result<usize> {
+    let plan = jobs::build_plan(args)?;
+
+    if let Some(dir) = &args.output {
+        fs::create_dir_all(dir)
+            .with_context(|| format!("creating output directory {}", dir.display()))?;
+    }
+
+    for source in &plan.skipped {
+        println!("skip   {} (target exists)", source.display());
+    }
+
+    let bar = ProgressBar::new(plan.jobs.len() as u64);
+    bar.set_style(
+        ProgressStyle::with_template("{bar:40.cyan/blue} {pos}/{len} {wide_msg}")
+            .expect("valid progress template"),
+    );
+
+    let mut converted = 0usize;
+    let mut failed = 0usize;
+    for job in &plan.jobs {
+        bar.set_message(file_label(job));
+        match convert_job(job, args.in_place) {
+            Ok(()) => converted += 1,
+            Err(e) => {
+                failed += 1;
+                bar.suspend(|| eprintln!("error: {}: {e:#}", job.source.display()));
+            }
+        }
+        bar.inc(1);
+    }
+    bar.finish_and_clear();
+
+    println!(
+        "converted {converted}, skipped {}, failed {failed}",
+        plan.skipped.len()
+    );
+    Ok(failed)
+}
+
+fn file_label(job: &Job) -> String {
+    job.source
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_default()
+}
+
+/// Convert a single EPUB and write its kepub, deleting the original for
+/// `--in-place`.
+fn convert_job(job: &Job, in_place: bool) -> Result<()> {
+    let input = fs::read(&job.source)
+        .with_context(|| format!("reading {}", job.source.display()))?;
+    let output = convert::convert_epub(&input)
+        .with_context(|| format!("converting {}", job.source.display()))?;
+    fs::write(&job.target, &output)
+        .with_context(|| format!("writing {}", job.target.display()))?;
+    if in_place && job.source != job.target {
+        fs::remove_file(&job.source)
+            .with_context(|| format!("removing original {}", job.source.display()))?;
     }
     Ok(())
 }
