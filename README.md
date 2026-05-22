@@ -24,9 +24,9 @@ kepub <INPUT> [OPTIONS]
 
 | Option | Effect |
 | ------ | ------ |
-| `--in-place` | Replace each source `.epub` with its `.kepub.epub` (the original is deleted). |
+| `-i, --in-place` | Replace each source `.epub` with its `.kepub.epub` (the original is deleted). |
 | `-o, --output <DIR>` | Write every converted file into one flat directory. |
-| `--overwrite` | Re-convert even when the target `.kepub.epub` already exists. |
+| `-f, --overwrite` | Re-convert even when the target `.kepub.epub` already exists. |
 
 By default `book.epub` becomes `book.kepub.epub` alongside the original. Files
 whose target already exists are skipped (reported on the console) unless
@@ -37,8 +37,9 @@ whose target already exists are skipped (reported on the console) unless
 ```
 kepub book.epub                  # -> book.kepub.epub next to it
 kepub ~/Books                    # convert every .epub under ~/Books
-kepub ~/Books --in-place         # replace the originals
-kepub ~/Books -o ~/Kobo          # collect all kepubs in one folder
+kepub ~/Books -i                 # replace the originals (--in-place)
+kepub ~/Books -o ~/Kobo          # collect all kepubs in one folder (--output)
+kepub ~/Books -f                 # re-convert, overwriting existing files (--overwrite)
 ```
 
 ## Building

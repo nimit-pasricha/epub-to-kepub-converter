@@ -11,14 +11,14 @@ pub struct Cli {
 
     /// Replace each source `.epub` with its converted `.kepub.epub`
     /// (the original file is deleted).
-    #[arg(long, conflicts_with = "output")]
+    #[arg(short, long, conflicts_with = "output")]
     pub in_place: bool,
 
     /// Write every converted file into this single flat directory.
-    #[arg(long, short, value_name = "DIR")]
+    #[arg(short, long, value_name = "DIR")]
     pub output: Option<PathBuf>,
 
     /// Re-convert files even if the target `.kepub.epub` already exists.
-    #[arg(long)]
+    #[arg(short = 'f', long)]
     pub overwrite: bool,
 }
