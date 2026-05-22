@@ -1,5 +1,6 @@
 mod cli;
 mod epub;
+mod html;
 mod jobs;
 
 use anyhow::Result;
