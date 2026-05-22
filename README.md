@@ -67,6 +67,25 @@ rustup target add x86_64-pc-windows-gnu
 cargo build --release --target x86_64-pc-windows-gnu
 ```
 
+## Performance notes
+
+Conversion is parallelized across books, across the content documents within
+each book, and across zip (de)compression. On a typical multi-core machine a
+book converts in roughly a tenth of a second.
+
+### Speed vs. file size
+
+The dominant remaining cost is deflate compression when re-packing the zip.
+Entries are compressed at the `zip` crate's default deflate level, which
+balances speed against output size.
+
+If you ever need conversion to be even faster and don't mind larger output,
+this is the knob: in `compress_entry` (`src/epub/zip_io.rs`), the
+`SimpleFileOptions` can be given an explicit `.compression_level(Some(n))`.
+A low level such as `Some(1)` compresses roughly 2–3x faster but produces
+`.kepub.epub` files about 5–10% larger. The default is left in place because
+file size usually matters more than shaving milliseconds.
+
 ## Testing
 
 ```
