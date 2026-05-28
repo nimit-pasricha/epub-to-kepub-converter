@@ -51,23 +51,6 @@ cargo build --release
 # -> target/release/kepub
 ```
 
-Windows, cross-compiled from Linux with [`cross`](https://github.com/cross-rs/cross)
-(requires Docker or Podman):
-
-```
-cargo install cross
-cross build --release --target x86_64-pc-windows-gnu
-# -> target/x86_64-pc-windows-gnu/release/kepub.exe
-```
-
-Alternatively, build for Windows with the MinGW toolchain instead of Docker:
-
-```
-rustup target add x86_64-pc-windows-gnu
-# install MinGW, e.g. on Debian/Ubuntu: apt install gcc-mingw-w64-x86-64
-cargo build --release --target x86_64-pc-windows-gnu
-```
-
 ## Performance notes
 
 Conversion is parallelized across books, across the content documents within
