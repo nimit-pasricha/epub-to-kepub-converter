@@ -44,7 +44,8 @@ kepub ~/Books -f                 # re-convert, overwriting existing files (--ove
 
 ## Building
 
-The tool is written in pure Rust and builds on Linux, macOS, and Windows.
+The tool is written in pure Rust and builds natively on Linux, macOS, and
+Windows.
 
 ```
 cargo build --release
@@ -52,6 +53,21 @@ cargo build --release
 
 On Linux the binary is at `target/release/kepub`, on Windows at
 `target\release\kepub.exe`.
+
+### Cross-compilation for Windows from Linux / WSL
+
+To build a Windows `.exe` from Linux or WSL without leaving the terminal:
+
+```bash
+# Install the MinGW linker and the Rust Windows target
+sudo apt install mingw-w64
+rustup target add x86_64-pc-windows-gnu
+
+cargo build --release --target x86_64-pc-windows-gnu
+# -> target/x86_64-pc-windows-gnu/release/kepub.exe
+```
+
+The resulting `kepub.exe` can be copied to Windows and run directly.
 
 ## Performance notes
 
