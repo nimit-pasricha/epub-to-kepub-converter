@@ -51,7 +51,7 @@ Windows.
 cargo build --release
 ```
 
-On Linux the binary is at `target/release/kepub`, on Windows at
+On Linux and macOS the binary is at `target/release/kepub`, on Windows at
 `target\release\kepub.exe`. Move it to a directory in your `PATH` to run it
 from anywhere.
 
