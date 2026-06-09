@@ -44,12 +44,14 @@ kepub ~/Books -f                 # re-convert, overwriting existing files (--ove
 
 ## Building
 
-Linux (native):
+The tool is written in pure Rust and builds on Linux, macOS, and Windows.
 
 ```
 cargo build --release
-# -> target/release/kepub
 ```
+
+On Linux the binary is at `target/release/kepub`, on Windows at
+`target\release\kepub.exe`.
 
 ## Performance notes
 
